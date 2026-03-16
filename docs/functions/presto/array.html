@@ -109,6 +109,20 @@ For REAL and DOUBLE, NANs (Not-a-Number) are considered equal.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="array_split_into_chunks">
+<span class="sig-name descname"><span class="pre">array_split_into_chunks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array(T)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sz)</span> <span class="pre">-&gt;</span> <span class="pre">array(array(T)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#array_split_into_chunks" title="Link to this definition">¶</a></dt>
+<dd><p>Returns an array of arrays splitting the input array into chunks of given
+length. The last chunk will be shorter than the chunk length if the array’s
+length is not an integer multiple of the chunk length. Ignores null inputs,
+but not elements.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SELECT</span> <span class="n">array_split_into_chunks</span><span class="p">(</span><span class="n">ARRAY</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="mi">2</span><span class="p">);</span> <span class="o">--</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="p">[</span><span class="mi">5</span><span class="p">]]</span>
+<span class="n">SELECT</span> <span class="n">array_split_into_chunks</span><span class="p">(</span><span class="n">ARRAY</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="mi">5</span><span class="p">);</span> <span class="o">--</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]]</span>
+<span class="n">SELECT</span> <span class="n">array_split_into_chunks</span><span class="p">(</span><span class="n">ARRAY</span> <span class="p">[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">],</span> <span class="mi">2</span><span class="p">);</span> <span class="o">--</span> <span class="p">[[</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;c&#39;</span><span class="p">]]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="array_duplicates">
 <span class="sig-name descname"><span class="pre">array_duplicates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array(E))</span> <span class="pre">-&gt;</span> <span class="pre">array(E</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#array_duplicates" title="Link to this definition">¶</a></dt>
 <dd><p>Returns a set of elements that occur more than once in array.
@@ -740,6 +754,7 @@ longer array, before applying <code class="docutils literal notranslate"><span c
 <li><a class="reference internal" href="#array_average"><code class="docutils literal notranslate"><span class="pre">array_average()</span></code></a></li>
 <li><a class="reference internal" href="#array_cum_sum"><code class="docutils literal notranslate"><span class="pre">array_cum_sum()</span></code></a></li>
 <li><a class="reference internal" href="#array_distinct"><code class="docutils literal notranslate"><span class="pre">array_distinct()</span></code></a></li>
+<li><a class="reference internal" href="#array_split_into_chunks"><code class="docutils literal notranslate"><span class="pre">array_split_into_chunks()</span></code></a></li>
 <li><a class="reference internal" href="#array_duplicates"><code class="docutils literal notranslate"><span class="pre">array_duplicates()</span></code></a></li>
 <li><a class="reference internal" href="#array_except"><code class="docutils literal notranslate"><span class="pre">array_except()</span></code></a></li>
 <li><a class="reference internal" href="#array_frequency"><code class="docutils literal notranslate"><span class="pre">array_frequency()</span></code></a></li>
