@@ -97,14 +97,14 @@ void RemoteVectorFunction::applyRemote(
 
   // TODO: serialize only active rows.
   if (preserveEncoding_) {
-    requestInputs->payload_ref() = rowVectorToIOBufBatch(
+    requestInputs->payload() = rowVectorToIOBufBatch(
         remoteRowVector,
         rows.end(),
         *context.pool(),
         serde_.get(),
         serdeOptions_.get());
   } else {
-    requestInputs->payload_ref() = rowVectorToIOBuf(
+    requestInputs->payload() = rowVectorToIOBuf(
         remoteRowVector, rows.end(), *context.pool(), serde_.get());
   }
 
