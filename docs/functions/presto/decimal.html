@@ -233,6 +233,16 @@ as follows:</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="ceil">
+<span class="sig-name descname"><span class="pre">ceil</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x:</span> <span class="pre">decimal(p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s))</span> <span class="pre">-&gt;</span> <span class="pre">r:</span> <span class="pre">decimal(pr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ceil" title="Link to this definition">¶</a></dt>
+<dd><p>Returns ‘x’ rounded up to the nearest integer. The scale of the result is 0.
+The precision is calculated as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pr</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">38</span><span class="p">,</span> <span class="n">p</span> <span class="o">-</span> <span class="n">s</span> <span class="o">+</span> <span class="nb">min</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="divide">
 <span class="sig-name descname"><span class="pre">divide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x:</span> <span class="pre">decimal(p1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s1)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y:</span> <span class="pre">decimal(p2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2))</span> <span class="pre">-&gt;</span> <span class="pre">r:</span> <span class="pre">decimal(p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#divide" title="Link to this definition">¶</a></dt>
 <dd><p>Returns the result of dividing x by y (r = x / y).</p>
@@ -395,6 +405,7 @@ Returns <code class="docutils literal notranslate"><span class="pre">x</span></c
 <li><a class="reference internal" href="#modulus">Modulus</a></li>
 <li><a class="reference internal" href="#decimal-functions">Decimal Functions</a><ul>
 <li><a class="reference internal" href="#abs"><code class="docutils literal notranslate"><span class="pre">abs()</span></code></a></li>
+<li><a class="reference internal" href="#ceil"><code class="docutils literal notranslate"><span class="pre">ceil()</span></code></a></li>
 <li><a class="reference internal" href="#divide"><code class="docutils literal notranslate"><span class="pre">divide()</span></code></a></li>
 <li><a class="reference internal" href="#floor"><code class="docutils literal notranslate"><span class="pre">floor()</span></code></a></li>
 <li><a class="reference internal" href="#minus"><code class="docutils literal notranslate"><span class="pre">minus()</span></code></a></li>
