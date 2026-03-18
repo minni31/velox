@@ -933,6 +933,9 @@ distribution fields.</p>
 <tr class="row-odd"><td><p>outputType</p></td>
 <td><p>A list of output columns. This is a subset of input columns possibly in a different order.</p></td>
 </tr>
+<tr class="row-even"><td><p>serdeKind</p></td>
+<td><p>Name of the serialization format to use for shuffling data. Built-in formats: ‘Presto’, ‘CompactRow’, ‘UnsafeRow’.</p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -980,6 +983,9 @@ streams are coming from remote exchange or shuffle.</p>
 <tr class="row-even"><td><p>type</p></td>
 <td><p>A list of columns in the input streams.</p></td>
 </tr>
+<tr class="row-odd"><td><p>serdeKind</p></td>
+<td><p>Name of the serialization format used by the upstream shuffle. Built-in formats: ‘Presto’, ‘CompactRow’, ‘UnsafeRow’.</p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -1006,6 +1012,9 @@ orderedness. Input streams are coming from remote exchange or shuffle.</p>
 </tr>
 <tr class="row-even"><td><p>sortingOrders</p></td>
 <td><p>Sorting order for each of the soring keys. See OrderBy for the list of supported orders.</p></td>
+</tr>
+<tr class="row-odd"><td><p>serdeKind</p></td>
+<td><p>Name of the serialization format used by the upstream shuffle. Built-in formats: ‘Presto’, ‘CompactRow’, ‘UnsafeRow’.</p></td>
 </tr>
 </tbody>
 </table>
