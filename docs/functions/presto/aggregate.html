@@ -397,35 +397,6 @@ the maps. All null values in the original maps are coalesced to 0.</p>
 </dd></dl>
 
 </section>
-<section id="array-aggregate-functions">
-<h2>Array Aggregate Functions<a class="headerlink" href="#array-aggregate-functions" title="Link to this heading">¶</a></h2>
-<dl class="py function">
-<dt class="sig sig-object py" id="vector_sum">
-<span class="sig-name descname"><span class="pre">vector_sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array(T))</span> <span class="pre">-&gt;</span> <span class="pre">array(T</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vector_sum" title="Link to this definition">¶</a></dt>
-<dd><p>Returns the element-wise sum of all input arrays. Equivalent to
-<code class="docutils literal notranslate"><span class="pre">ARRAY[SUM(a[1]),</span> <span class="pre">SUM(a[2]),</span> <span class="pre">...]</span></code>, with the same null-handling
-semantics as <a class="reference internal" href="#sum" title="sum"><code class="xref py py-func docutils literal notranslate"><span class="pre">sum()</span></code></a>: null elements are skipped, and positions
-where all input values are null produce null in the output.
-All input arrays must have the same length; an error is raised if
-arrays of different lengths are encountered.
-Supported types for T are: TINYINT, SMALLINT, INTEGER, BIGINT, REAL
-and DOUBLE.
-For integer types, arithmetic overflow results in an error,
-consistent with the behavior of <a class="reference internal" href="#sum" title="sum"><code class="xref py py-func docutils literal notranslate"><span class="pre">sum()</span></code></a>. For floating-point
-types (REAL, DOUBLE), NaN values propagate through the sum and
-overflow produces Infinity, following standard IEEE 754 semantics.</p>
-<p>This is useful when rows contain fixed-dimension vectors (e.g.
-embedding vectors or feature arrays) and you need to compute a
-component-wise sum across all rows:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SELECT</span> <span class="n">vector_sum</span><span class="p">(</span><span class="n">embedding</span><span class="p">)</span> <span class="n">FROM</span> <span class="n">item_embeddings</span><span class="p">;</span>
-
-<span class="o">--</span> <span class="n">With</span> <span class="mi">3</span> <span class="n">rows</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">],</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">300</span><span class="p">]</span>
-<span class="o">--</span> <span class="n">Returns</span><span class="p">:</span>     <span class="p">[</span><span class="mi">111</span><span class="p">,</span> <span class="mi">222</span><span class="p">,</span> <span class="mi">333</span><span class="p">]</span>
-</pre></div>
-</div>
-</dd></dl>
-
-</section>
 <section id="approximate-aggregate-functions">
 <h2>Approximate Aggregate Functions<a class="headerlink" href="#approximate-aggregate-functions" title="Link to this heading">¶</a></h2>
 <dl class="py function">
@@ -1236,10 +1207,6 @@ In Journal of Computer and System Sciences, 31:182-209, 1985</p>
 <li><a class="reference internal" href="#map_agg"><code class="docutils literal notranslate"><span class="pre">map_agg()</span></code></a></li>
 <li><a class="reference internal" href="#map_union"><code class="docutils literal notranslate"><span class="pre">map_union()</span></code></a></li>
 <li><a class="reference internal" href="#map_union_sum"><code class="docutils literal notranslate"><span class="pre">map_union_sum()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#array-aggregate-functions">Array Aggregate Functions</a><ul>
-<li><a class="reference internal" href="#vector_sum"><code class="docutils literal notranslate"><span class="pre">vector_sum()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#approximate-aggregate-functions">Approximate Aggregate Functions</a><ul>
