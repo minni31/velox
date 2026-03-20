@@ -60,21 +60,6 @@ and checksumming) and memory (for buffering).</p>
 </div>
 <p>Velox also uses another row-wise serialization format, ContainerRowSerde, for storing
 data in aggregation and join operators. This format is similar to CompactRow.</p>
-<section id="serde-registration-api">
-<h2>Serde Registration API<a class="headerlink" href="#serde-registration-api" title="Link to this heading">¶</a></h2>
-<p>Velox uses a named registry for serialization formats. Each serde is registered
-under a unique string name via <code class="docutils literal notranslate"><span class="pre">registerNamedVectorSerde(name,</span> <span class="pre">serde)</span></code> and
-retrieved with <code class="docutils literal notranslate"><span class="pre">getNamedVectorSerde(name)</span></code>. Use
-<code class="docutils literal notranslate"><span class="pre">isRegisteredNamedVectorSerde(name)</span></code> to check whether a name has been
-registered. Names must be non-empty; passing an empty string throws.</p>
-<p>Built-in format names are available via the <code class="docutils literal notranslate"><span class="pre">name()</span></code> static method on each serde class:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">serializer::presto::PrestoVectorSerde::name()</span></code> — <code class="docutils literal notranslate"><span class="pre">&quot;Presto&quot;</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">serializer::CompactRowVectorSerde::name()</span></code> — <code class="docutils literal notranslate"><span class="pre">&quot;CompactRow&quot;</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">serializer::spark::UnsafeRowVectorSerde::name()</span></code> — <code class="docutils literal notranslate"><span class="pre">&quot;UnsafeRow&quot;</span></code></p></li>
-</ul>
-<p>Custom formats can be registered under any non-empty name.</p>
-</section>
 </section>
 
 
@@ -84,16 +69,6 @@ registered. Names must be non-empty; passing an empty string throws.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
-  <div>
-    <h3><a href="../index.html">Table of Contents</a></h3>
-    <ul>
-<li><a class="reference internal" href="#">Serialization Formats</a><ul>
-<li><a class="reference internal" href="#serde-registration-api">Serde Registration API</a></li>
-</ul>
-</li>
-</ul>
-
-  </div>
   <div>
     <h4>Previous topic</h4>
     <p class="topless"><a href="spilling.html"
