@@ -175,6 +175,12 @@ hash build operators. This stat is only reported by the HashBuild operator.</p><
 <td></td>
 <td><p>The number of running table scan drivers.</p></td>
 </tr>
+<tr class="row-odd"><td><p>fileFormat.&lt;format&gt;</p></td>
+<td></td>
+<td><p>The number of splits read for each file format (e.g. fileFormat.dwrf,
+fileFormat.parquet, fileFormat.nimble). Reported per format encountered
+during the query.</p></td>
+</tr>
 </tbody>
 </table>
 </section>
