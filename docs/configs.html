@@ -1024,14 +1024,23 @@ disabled if files are not immutable, i.e. file content may change while file pat
 <td><p>10MB</p></td>
 <td><p>Maximum bytes for sort writer in one batch of output. This is to limit the memory usage of sort writer.</p></td>
 </tr>
-<tr class="row-odd"><td><p>file-preload-threshold</p></td>
+<tr class="row-odd"><td><p>max-target-file-size</p></td>
+<td><p>max_target_file_size</p></td>
+<td><p>string</p></td>
+<td><p>0B</p></td>
+<td><p>Maximum target file size for writers. When a file exceeds this size during writing, the writer
+closes the current file and starts writing to a new file. Accepts human-readable values like
+“1GB”. Zero means no limit (default). File rotation is not supported for bucketed tables or
+sorted writes.</p></td>
+</tr>
+<tr class="row-even"><td><p>file-preload-threshold</p></td>
 <td></td>
 <td><p>integer</p></td>
 <td><p>8MB</p></td>
 <td><p>Usually Velox fetches the meta data firstly then fetch the rest of file. But if the file is very small, Velox can fetch the whole file directly to avoid multiple IO requests.
 The parameter controls the threshold when whole file is fetched.</p></td>
 </tr>
-<tr class="row-even"><td><p>cache.no_retention</p></td>
+<tr class="row-odd"><td><p>cache.no_retention</p></td>
 <td><p>cache.no_retention</p></td>
 <td><p>bool</p></td>
 <td><p>false</p></td>
@@ -1040,7 +1049,7 @@ and also skip staging to the ssd cache. This helps to prevent the cache space po
 from the one-time table scan by large batch query when mixed running with interactive
 query which has high data locality.</p></td>
 </tr>
-<tr class="row-odd"><td><p>hive.reader.stats_based_filter_reorder_disabaled</p></td>
+<tr class="row-even"><td><p>hive.reader.stats_based_filter_reorder_disabaled</p></td>
 <td><p>hive.reader.stats_based_filter_reorder_disabaled</p></td>
 <td><p>bool</p></td>
 <td><p>false</p></td>
@@ -1049,26 +1058,26 @@ filter execution order is totally determined by the filter type. Otherwise, the 
 reader will dynamically adjust the filter execution order based on the past filter
 execution stats.</p></td>
 </tr>
-<tr class="row-even"><td><p>hive.reader.timestamp-partition-value-as-local-time</p></td>
+<tr class="row-odd"><td><p>hive.reader.timestamp-partition-value-as-local-time</p></td>
 <td><p>hive.reader.timestamp_partition_value_as_local_time</p></td>
 <td><p>bool</p></td>
 <td><p>true</p></td>
 <td><p>Reads timestamp partition value as local time if true. Otherwise, reads as UTC.</p></td>
 </tr>
-<tr class="row-odd"><td><p>hive.preserve-flat-maps-in-memory</p></td>
+<tr class="row-even"><td><p>hive.preserve-flat-maps-in-memory</p></td>
 <td><p>hive.preserve_flat_maps_in_memory</p></td>
 <td><p>bool</p></td>
 <td><p>false</p></td>
 <td><p>Whether to preserve flat maps in memory as FlatMapVectors instead of converting them to MapVectors. This is only applied during data reading inside the DWRF and Nimble readers, not during downstream processing like expression evaluation etc.</p></td>
 </tr>
-<tr class="row-even"><td><p>hive.max-rows-per-index-request</p></td>
+<tr class="row-odd"><td><p>hive.max-rows-per-index-request</p></td>
 <td><p>hive.max_rows_per_index_request</p></td>
 <td><p>integer</p></td>
 <td><p>0</p></td>
 <td><p>Maximum number of output rows to return per index lookup request. The limit is applied to the actual output rows
 after filtering. 0 means no limit (default).</p></td>
 </tr>
-<tr class="row-odd"><td><p>file-metadata-cache-enabled</p></td>
+<tr class="row-even"><td><p>file-metadata-cache-enabled</p></td>
 <td><p>file_metadata_cache_enabled</p></td>
 <td><p>bool</p></td>
 <td><p>false</p></td>
@@ -1076,7 +1085,7 @@ after filtering. 0 means no limit (default).</p></td>
 the first reader performs a speculative tail read and populates the cache; subsequent readers on the same file
 serve metadata from cache with zero file IO. Currently only supported by Nimble format.</p></td>
 </tr>
-<tr class="row-even"><td><p>hive.reader.collect-column-stats</p></td>
+<tr class="row-odd"><td><p>hive.reader.collect-column-stats</p></td>
 <td><p>hive.reader.collect_column_stats</p></td>
 <td><p>bool</p></td>
 <td><p>false</p></td>
@@ -1085,7 +1094,7 @@ decompression and decode CPU time metrics for each column, reported as runtime m
 <code class="docutils literal notranslate"><span class="pre">column_&lt;nodeId&gt;.&lt;type&gt;.decompressCPUTimeNanos</span></code> and <code class="docutils literal notranslate"><span class="pre">column_&lt;nodeId&gt;.&lt;type&gt;.decodeCPUTimeNanos</span></code>.
 Useful for performance analysis and identifying slow columns.</p></td>
 </tr>
-<tr class="row-odd"><td><p>hive.orc.footer-speculative-io-size</p></td>
+<tr class="row-even"><td><p>hive.orc.footer-speculative-io-size</p></td>
 <td><p>orc_footer_speculative_io_size</p></td>
 <td><p>integer</p></td>
 <td><p>256KB</p></td>
@@ -1093,7 +1102,7 @@ Useful for performance analysis and identifying slow columns.</p></td>
 of the file to load the footer and nearby metadata in a single IO operation.
 Set to 0 for adaptive mode.</p></td>
 </tr>
-<tr class="row-even"><td><p>hive.parquet.footer-speculative-io-size</p></td>
+<tr class="row-odd"><td><p>hive.parquet.footer-speculative-io-size</p></td>
 <td><p>parquet_footer_speculative_io_size</p></td>
 <td><p>integer</p></td>
 <td><p>256KB</p></td>
@@ -1101,7 +1110,7 @@ Set to 0 for adaptive mode.</p></td>
 of the file to load the footer and nearby metadata in a single IO operation.
 Set to 0 for adaptive mode.</p></td>
 </tr>
-<tr class="row-odd"><td><p>hive.nimble.footer-speculative-io-size</p></td>
+<tr class="row-even"><td><p>hive.nimble.footer-speculative-io-size</p></td>
 <td><p>nimble_footer_speculative_io_size</p></td>
 <td><p>integer</p></td>
 <td><p>8MB</p></td>
@@ -1233,7 +1242,7 @@ Valid values are “V1” and “V2”.</p></td>
 <td><p>Batch size used when writing into Parquet through Arrow bridge.</p></td>
 </tr>
 <tr class="row-even"><td><p>hive.parquet.writer.created-by</p></td>
-<td></td>
+<td><p>hive.parquet.writer.created_by</p></td>
 <td><p>string</p></td>
 <td><p>parquet-cpp-velox version 0.0.0</p></td>
 <td><p>Created-by value used when writing to Parquet.</p></td>
