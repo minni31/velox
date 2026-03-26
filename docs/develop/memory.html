@@ -532,7 +532,7 @@ between queries by adjusting their memory pool’s capacities accordingly (see
 <a class="reference external" href="#memory-arbitration-process">memory arbitration process section</a> for detail).</p>
 <p>The <em>MemoryArbitrator</em> is defined to support different implementations for
 different query systems. As for now, we implement <em>SharedArbitrator</em> for both
-Prestissimo and Prestissimo-on-Spark. <a class="reference external" href="https://github.com/apache/incubator-gluten">Gluten</a> implements its own memory
+Prestissimo and Prestissimo-on-Spark. <a class="reference external" href="https://github.com/apache/gluten">Gluten</a> implements its own memory
 arbitrator to integrate with the <a class="reference external" href="https://www.linkedin.com/pulse/apache-spark-memory-management-deep-dive-deepak-rajak/">Spark memory system</a>. <em>SharedArbitrator</em>
 ensures the total allocated memory capacity is within the query memory limit
 (<em>MemoryManager::Options::arbitratorCapacity</em>), and also ensures each individual
