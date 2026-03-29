@@ -136,7 +136,7 @@ Velox Task Barrier:</p>
 <span class="w">    </span><span class="c1">// Fetch next batch of results (velox vector)</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">veloxTask</span><span class="o">-&gt;</span><span class="n">next</span><span class="p">(</span><span class="o">&amp;</span><span class="n">dataFuture</span><span class="p">);</span>
 
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="k">nullptr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">      </span><span class="c1">// Consume the data (e.g., feed to training loop)</span>
 <span class="w">      </span><span class="n">consume</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
 <span class="w">      </span><span class="k">continue</span><span class="p">;</span>
