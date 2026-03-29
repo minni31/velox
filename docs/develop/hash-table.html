@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Hash table &#8212; Velox  documentation</title>
+    <title>Hash Table &#8212; Velox  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=0f882399" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
@@ -31,7 +31,7 @@
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">Velox  documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../develop.html" accesskey="U">Developer Guide</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Hash table</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Hash Table</a></li> 
       </ul>
     </div>  
 
@@ -41,7 +41,7 @@
           <div class="body" role="main">
             
   <section id="hash-table">
-<h1>Hash table<a class="headerlink" href="#hash-table" title="Link to this heading">¶</a></h1>
+<h1>Hash Table<a class="headerlink" href="#hash-table" title="Link to this heading">¶</a></h1>
 <p>The hash table used in Velox is similar to the
 <a class="reference external" href="https://engineering.fb.com/2019/04/25/developer-tools/f14/">F14 hash table</a>.
 The main difference is that the Velox hash table allows vectorized inserts and lookups, while F14 doesn’t.</p>
@@ -127,10 +127,143 @@ insert an entry, we compute a hash, extract tag and bucket number, go to the buc
 entry if there is space. If the bucket is full, we proceed to the next bucket and continue until we
 find a bucket with an empty slot. We insert the new entry there.</p>
 </section>
+<section id="hash-modes">
+<h2>Hash Modes<a class="headerlink" href="#hash-modes" title="Link to this heading">¶</a></h2>
+<p>The description above covers the default bucket-based hash table (kHash mode).
+Velox also supports two optimized modes that avoid per-entry hashing and
+bucket probing when the key values allow it. The hash table analyzes the key
+data during build and selects the best mode automatically.</p>
+<p>The three modes are:</p>
+<ul class="simple">
+<li><p><strong>kArray</strong> — Direct array lookup. Does not use the bucket-based hash table at
+all. Each key combination maps to an index in a flat array. Lookup is O(1)
+with no hashing or probing. Used when the combined key space is small enough
+to fit in an array.</p></li>
+<li><p><strong>kNormalizedKey</strong> — Bucket-based (same layout as kHash), but keys are
+encoded into a single 64-bit normalized key stored alongside each row. Key
+comparison uses this normalized key instead of comparing individual columns,
+which is faster for multi-column keys.</p></li>
+<li><p><strong>kHash</strong> — Bucket-based with full key comparison. Used when keys cannot be
+mapped to value IDs or normalized into 64 bits (e.g., complex types like
+ARRAY, MAP, ROW).</p></li>
+</ul>
+<section id="karray-mode">
+<h3>kArray Mode<a class="headerlink" href="#karray-mode" title="Link to this heading">¶</a></h3>
+<p>In kArray mode, the bucket-based hash table is not used at all. Instead,
+<code class="docutils literal notranslate"><span class="pre">table_</span></code> is a flat array of pointers indexed directly by a value ID computed
+from the key columns. Lookup is a single array access — no hashing, no tag
+comparison, no probing.</p>
+<p>VectorHasher tracks the range (min, max) and distinct values for each key
+column. Each column is assigned a <em>multiplier</em> so that multi-column keys
+produce a unique combined index:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>index = valueId(col0) + valueId(col1) * multiplier1 + valueId(col2) * multiplier2 + ...
+</pre></div>
+</div>
+<p>The value ID for a column is computed using one of two approaches:</p>
+<ol class="arabic simple">
+<li><p><strong>Range-based</strong>: for numeric types, the value ID is <code class="docutils literal notranslate"><span class="pre">value</span> <span class="pre">-</span> <span class="pre">min</span></code>. The
+array dimension for the column is the range (max - min + 1). The combined
+product of all column ranges must be &lt; 2M. This is preferred when the range
+is within 20x of the distinct count (to avoid wasting array space on sparse
+ranges).</p></li>
+<li><p><strong>Distinct-value-based</strong>: VectorHasher maintains a mapping from each unique
+value to a consecutive integer ID (0, 1, 2, …). This works for all
+supported types including VARCHAR, where each unique string gets its own
+ID. The combined product of per-column distinct counts must be &lt; 2M.
+This is used when ranges are too large or not applicable (e.g., for
+VARCHAR, where values don’t have a numeric range).</p></li>
+</ol>
+<p>The array size is the product of all per-column dimensions (ranges or distinct
+counts), capped at <code class="docutils literal notranslate"><span class="pre">kArrayHashMaxSize</span></code> (2M entries = 16MB of pointer
+storage).</p>
+<p><strong>Supported types</strong>: BOOLEAN, TINYINT, SMALLINT, INTEGER, BIGINT, VARCHAR,
+VARBINARY, TIMESTAMP. Types like REAL, DOUBLE, ARRAY, MAP, ROW do not support
+value ID tracking and cannot use kArray mode.</p>
+<p><strong>Examples</strong>:</p>
+<ul class="simple">
+<li><p>Two BIGINT columns, 500 rows with values 0..499. Range per column is 500,
+combined range is 500 * 500 = 250’000 &lt; 2M. Uses range-based kArray.
+(See <code class="docutils literal notranslate"><span class="pre">HashTableTest.int2DenseArray</span></code>.)</p></li>
+<li><p>One VARCHAR column, 500 rows. Each unique string is assigned a consecutive
+ID (e.g., “apple” → 0, “banana” → 1, …). With 500 distinct values, the
+array has 500 entries. (See <code class="docutils literal notranslate"><span class="pre">HashTableTest.string1DenseArray</span></code>.)</p></li>
+<li><p>Two BIGINT columns, 500 rows with spacing 1’000 (values 0, 1000, 2000, …).
+Range per column is 500’000, combined range is 250B — too large. But distinct
+count per column is 500, combined 250’000 &lt; 2M. Uses distinct-value-based
+kArray. (See <code class="docutils literal notranslate"><span class="pre">HashTableTest.int2SparseArray</span></code>.)</p></li>
+</ul>
+</section>
+<section id="knormalizedkey-mode">
+<h3>kNormalizedKey Mode<a class="headerlink" href="#knormalizedkey-mode" title="Link to this heading">¶</a></h3>
+<p>When the combined key space exceeds 2M entries but can be encoded into a single
+64-bit integer, the table uses kNormalizedKey mode. This uses the same
+bucket-based layout as kHash, but stores a 64-bit <em>normalized key</em> immediately
+before each row in the RowContainer.</p>
+<p>The normalized key is computed using the same multiplier-based encoding as
+kArray mode:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>normalizedKey = valueId(col0) + valueId(col1) * multiplier1 + ...
+</pre></div>
+</div>
+<p>During lookups, the normalized key is compared first — a single 64-bit integer
+comparison. If it doesn’t match, the full per-column key comparison is skipped.
+This is particularly effective for multi-column keys where comparing individual
+columns would require multiple memory accesses and type-specific comparisons.</p>
+<p><strong>Examples</strong>:</p>
+<ul class="simple">
+<li><p>Two VARCHAR columns, 5’000 rows. Distinct count per column exceeds what fits
+in a flat array, but the combined distinct values fit in 64 bits.
+(See <code class="docutils literal notranslate"><span class="pre">HashTableTest.string2Normalized</span></code>.)</p></li>
+<li><p>Two BIGINT columns, 10’000 rows with spacing 1’000 (values 0, 1000, 2000,
+…). Range per column is 10M, combined range overflows the 2M array limit,
+but fits in a 64-bit normalized key.
+(See <code class="docutils literal notranslate"><span class="pre">HashTableTest.int2SparseNormalized</span></code>.)</p></li>
+</ul>
+</section>
+<section id="khash-mode">
+<h3>kHash Mode<a class="headerlink" href="#khash-mode" title="Link to this heading">¶</a></h3>
+<p>This is the fallback mode used when:</p>
+<ul class="simple">
+<li><p>Key types don’t support value IDs (e.g., ARRAY, MAP, ROW, DOUBLE, REAL).</p></li>
+<li><p>A single key column has more than 10’000 distinct values and the range
+overflows (cannot use normalized keys).</p></li>
+<li><p>Both the combined range and combined distinct count overflow 64 bits.</p></li>
+</ul>
+<p>In this mode, lookups compute a hash, probe buckets, compare tags, and then
+compare actual key values by following pointers to the RowContainer.</p>
+<p><strong>Examples</strong>:</p>
+<ul class="simple">
+<li><p>One ROW(BIGINT, VARCHAR, BIGINT) column. ROW type does not support value IDs.
+(See <code class="docutils literal notranslate"><span class="pre">HashTableTest.structKey</span></code>.)</p></li>
+<li><p>Six columns (5 BIGINT + 1 VARCHAR), 100’000 rows with spacing 1’000. The
+combined cardinality overflows 64 bits.
+(See <code class="docutils literal notranslate"><span class="pre">HashTableTest.mixed6Sparse</span></code>.)</p></li>
+</ul>
+</section>
+<section id="mode-selection">
+<h3>Mode Selection<a class="headerlink" href="#mode-selection" title="Link to this heading">¶</a></h3>
+<p>The mode is selected by <code class="docutils literal notranslate"><span class="pre">decideHashMode()</span></code> using this priority:</p>
+<ol class="arabic simple">
+<li><p>If combined ranges &lt; 2M → <strong>kArray</strong> (range-based).</p></li>
+<li><p>If best combination of per-column ranges/distincts &lt; 2M → <strong>kArray</strong>
+(mixed).</p></li>
+<li><p>If combined ranges fit in 64 bits → <strong>kNormalizedKey</strong>.</p></li>
+<li><p>If single key column with &gt; 10’000 distincts → <strong>kHash</strong> (normalized key
+not worthwhile for a single wide column).</p></li>
+<li><p>If combined distincts &lt; 2M → <strong>kArray</strong> (distinct-value-based).</p></li>
+<li><p>If both ranges and distincts overflow → <strong>kHash</strong>.</p></li>
+<li><p>Otherwise → <strong>kNormalizedKey</strong> (combined distincts fit in 64 bits).</p></li>
+</ol>
+<p>The selected mode is reported in the <code class="docutils literal notranslate"><span class="pre">hashtable.hashMode</span></code> runtime stat:
+0 for kHash, 1 for kArray, 2 for kNormalizedKey.</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">HashTableTest</span></code> in <code class="docutils literal notranslate"><span class="pre">velox/exec/tests/HashTableTest.cpp</span></code> for tests
+covering all three modes.</p>
+</section>
+</section>
 <section id="use-cases">
 <h2>Use Cases<a class="headerlink" href="#use-cases" title="Link to this heading">¶</a></h2>
-<p>The main use cases for the hash table are <a class="reference external" href="joins.html">Join</a> and
-<a class="reference external" href="aggregations.html">Aggregation</a> operators.</p>
+<p>The main use cases for the hash table are <a class="reference internal" href="joins.html"><span class="doc">Join</span></a> and
+<a class="reference internal" href="aggregations.html"><span class="doc">Aggregation</span></a> operators. It is also used by RowNumber,
+TopNRowNumber, and MarkDistinct operators.</p>
 <p>The HashBuild operator builds the hash table to store unique values of the join keys found on the build
 side of the join. The HashProbe operator looks up entries in the hash table using join keys from the
 probe side. The HashProbe operator does not insert new entries into the hash table and never triggers
@@ -156,10 +289,17 @@ functions.</p>
   <div>
     <h3><a href="../index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">Hash table</a><ul>
+<li><a class="reference internal" href="#">Hash Table</a><ul>
 <li><a class="reference internal" href="#layout">Layout</a></li>
 <li><a class="reference internal" href="#inserting-an-entry">Inserting an entry</a></li>
 <li><a class="reference internal" href="#resizing">Resizing</a></li>
+<li><a class="reference internal" href="#hash-modes">Hash Modes</a><ul>
+<li><a class="reference internal" href="#karray-mode">kArray Mode</a></li>
+<li><a class="reference internal" href="#knormalizedkey-mode">kNormalizedKey Mode</a></li>
+<li><a class="reference internal" href="#khash-mode">kHash Mode</a></li>
+<li><a class="reference internal" href="#mode-selection">Mode Selection</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#use-cases">Use Cases</a></li>
 <li><a class="reference internal" href="#implementation">Implementation</a></li>
 </ul>
@@ -212,7 +352,7 @@ functions.</p>
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">Velox  documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../develop.html" >Developer Guide</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Hash table</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Hash Table</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
