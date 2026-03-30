@@ -407,6 +407,40 @@ struct Converter<
     }
   };
 
+  /// Shared helper for SparkTryCastPolicy: truncate toward zero, then check
+  /// if the truncated value fits in the target integral type T.
+  /// Matches Spark/Java try_cast semantics:
+  ///   try_cast(2147483647.9D as int) → trunc = 2147483647 → fits → return it
+  ///   try_cast(3.22E9F as tinyint) → trunc = 3221225472 → exceeds → null
+  template <typename FP>
+  static Expected<T> sparkTryCastFloatToIntegral(FP v) {
+    auto truncated = std::trunc(v);
+    if constexpr (!std::is_same_v<T, int128_t>) {
+      if (truncated > static_cast<double>(std::numeric_limits<T>::max())) {
+        return folly::makeUnexpected(Status::UserError("overflow"));
+      }
+      if (truncated < static_cast<double>(std::numeric_limits<T>::min())) {
+        return folly::makeUnexpected(Status::UserError("overflow"));
+      }
+      if (truncated >= static_cast<double>(std::numeric_limits<T>::max())) {
+        return std::numeric_limits<T>::max();
+      }
+      if (truncated <= static_cast<double>(std::numeric_limits<T>::min())) {
+        return std::numeric_limits<T>::min();
+      }
+    } else {
+      // int128_t: double max (~1.8e308) can exceed int128_t range (~1.7e38).
+      // Currently unreachable from Spark casts, but guard defensively.
+      if (truncated >
+              static_cast<double>(std::numeric_limits<int128_t>::max()) ||
+          truncated <
+              static_cast<double>(std::numeric_limits<int128_t>::min())) {
+        return folly::makeUnexpected(Status::UserError("overflow"));
+      }
+    }
+    return static_cast<T>(truncated);
+  }
+
   static Expected<T> tryCast(const float& v) {
     if constexpr (TPolicy::truncate) {
       if (std::isnan(v)) {
@@ -428,7 +462,7 @@ struct Converter<
             Status::UserError("Cannot cast NaN to an integral value."));
       }
       if constexpr (std::is_same_v<TPolicy, SparkTryCastPolicy>) {
-        return detail::callFollyTo<T>(std::trunc(v));
+        return sparkTryCastFloatToIntegral(v);
       }
       return detail::callFollyTo<T>(std::round(v));
     }
@@ -455,7 +489,7 @@ struct Converter<
             Status::UserError("Cannot cast NaN to an integral value."));
       }
       if constexpr (std::is_same_v<TPolicy, SparkTryCastPolicy>) {
-        return detail::callFollyTo<T>(std::trunc(v));
+        return sparkTryCastFloatToIntegral(v);
       }
       return detail::callFollyTo<T>(std::round(v));
     }

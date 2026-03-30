@@ -24,6 +24,14 @@ bool isIntegralType(const TypePtr& type) {
       type == BIGINT();
 }
 
+bool isFloatingPointType(const TypePtr& type) {
+  return type == REAL() || type == DOUBLE();
+}
+
+bool isNumericType(const TypePtr& type) {
+  return isIntegralType(type) || isFloatingPointType(type);
+}
+
 } // namespace
 
 bool SparkCastCallToSpecialForm::isAnsiSupported(
@@ -39,6 +47,14 @@ bool SparkCastCallToSpecialForm::isAnsiSupported(
       // decimal points) instead of returning NULL.
       return true;
     }
+  }
+
+  // Currently supports ANSI overflow checking for:
+  //   {integral, floating-point} -> {integral} casts only.
+  // TODO: Extend to decimal->integral, string->integral (tracked in
+  //   apache/incubator-gluten#10134).
+  if (isNumericType(fromType) && isIntegralType(toType)) {
+    return true;
   }
 
   return false;

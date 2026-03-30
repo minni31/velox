@@ -1592,5 +1592,221 @@ TEST_F(SparkCastExprTestAnsiOff, overflow) {
 TEST_F(SparkCastExprTestAnsiOff, recursiveTryCast) {
   testRecursiveTryCast();
 }
+
+TEST_F(SparkCastExprTest, castNumericToIntegralAnsiOverflow) {
+  auto guard = folly::makeGuard([&] { setAnsiSupport(false); });
+
+  // Test with ANSI mode OFF - should wrap/truncate without error
+  setAnsiSupport(false);
+
+  // INT32 -> TINYINT overflow (wraps in non-ANSI mode)
+  auto result = evaluateOnce<int8_t>(
+      "cast(c0 as tinyint)", makeRowVector({makeFlatVector<int32_t>({256})}));
+  // 256 mod 256 = 0 (matches Java (byte)256)
+  EXPECT_EQ(result.value(), 0);
+
+  // INT64 -> SMALLINT overflow (wraps in non-ANSI mode)
+  auto result16 = evaluateOnce<int16_t>(
+      "cast(c0 as smallint)",
+      makeRowVector({makeFlatVector<int64_t>({100000})}));
+  // 100000 mod 65536 = 34464 -> signed = -31072 (matches Java (short)100000)
+  EXPECT_EQ(result16.value(), static_cast<int16_t>(-31072));
+
+  // DOUBLE -> INTEGER overflow (saturates to INT32_MAX in non-ANSI mode)
+  auto resultInt = evaluateOnce<int32_t>(
+      "cast(c0 as int)", makeRowVector({makeFlatVector<double>({3.0e10})}));
+  EXPECT_EQ(resultInt.value(), std::numeric_limits<int32_t>::max());
+
+  // Test with ANSI mode ON - should throw on overflow
+  setAnsiSupport(true);
+
+  // INT32 -> TINYINT overflow (should throw in ANSI mode)
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int8_t>(
+          "cast(c0 as tinyint)",
+          makeRowVector({makeFlatVector<int32_t>({256})})),
+      "Cannot cast INTEGER '256' to TINYINT");
+
+  // INT64 -> SMALLINT overflow (should throw in ANSI mode)
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int16_t>(
+          "cast(c0 as smallint)",
+          makeRowVector({makeFlatVector<int64_t>({100000})})),
+      "Cannot cast BIGINT '100000' to SMALLINT");
+
+  // DOUBLE -> INTEGER overflow (should throw in ANSI mode)
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int32_t>(
+          "cast(c0 as int)", makeRowVector({makeFlatVector<double>({3.0e10})})),
+      "Cannot cast DOUBLE '3");
+
+  // DOUBLE -> BIGINT overflow (should throw in ANSI mode)
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int64_t>(
+          "cast(c0 as bigint)",
+          makeRowVector({makeFlatVector<double>({1.0e20})})),
+      "Cannot cast DOUBLE '1");
+
+  // Negative overflow tests
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int8_t>(
+          "cast(c0 as tinyint)",
+          makeRowVector({makeFlatVector<int32_t>({-200})})),
+      "Cannot cast INTEGER '-200' to TINYINT");
+
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int16_t>(
+          "cast(c0 as smallint)",
+          makeRowVector({makeFlatVector<int64_t>({-50000})})),
+      "Cannot cast BIGINT '-50000' to SMALLINT");
+
+  // Valid casts should still work in ANSI mode
+  auto validResult = evaluateOnce<int8_t>(
+      "cast(c0 as tinyint)", makeRowVector({makeFlatVector<int32_t>({127})}));
+  EXPECT_EQ(validResult.value(), 127);
+
+  validResult = evaluateOnce<int8_t>(
+      "cast(c0 as tinyint)", makeRowVector({makeFlatVector<int32_t>({-128})}));
+  EXPECT_EQ(validResult.value(), -128);
+
+  // NaN should throw in ANSI mode
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int32_t>(
+          "cast(c0 as int)",
+          makeRowVector({makeFlatVector<float>(
+              {std::numeric_limits<float>::quiet_NaN()})})),
+      "Cannot cast NaN to an integral value");
+
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int64_t>(
+          "cast(c0 as bigint)",
+          makeRowVector({makeFlatVector<double>(
+              {std::numeric_limits<double>::quiet_NaN()})})),
+      "Cannot cast NaN to an integral value");
+
+  // Infinity should throw in ANSI mode
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int32_t>(
+          "cast(c0 as int)",
+          makeRowVector({makeFlatVector<double>(
+              {std::numeric_limits<double>::infinity()})})),
+      "Cannot cast DOUBLE 'Infinity' to INTEGER");
+
+  VELOX_ASSERT_THROW(
+      evaluateOnce<int32_t>(
+          "cast(c0 as int)",
+          makeRowVector({makeFlatVector<double>(
+              {-std::numeric_limits<double>::infinity()})})),
+      "Cannot cast DOUBLE '-Infinity' to INTEGER");
+}
+
+TEST_F(SparkCastExprTest, tryCastFloatToIntegralSaturation) {
+  // Spark try_cast for float/double to integral: saturates when the float
+  // value equals (float)T.MaxValue (due to FP precision), returns null when
+  // the float value clearly exceeds the target type's range.
+
+  // FLOAT -> BIGINT: Long.MaxValue + 0.9F saturates to Long.MaxValue
+  // (because (float)(Long.MaxValue+0.9) == (float)Long.MaxValue)
+  auto result = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector(
+          {makeFlatVector<float>({9.223372E18f})})); // Long.MaxValue + 0.9F
+  EXPECT_EQ(result.value(), std::numeric_limits<int64_t>::max());
+
+  // FLOAT -> BIGINT: Long.MinValue - 0.9F saturates to Long.MinValue
+  result = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector({makeFlatVector<float>({-9.223372E18f})}));
+  EXPECT_EQ(result.value(), std::numeric_limits<int64_t>::min());
+
+  // DOUBLE -> BIGINT: Long.MaxValue + 0.9D saturates to Long.MaxValue
+  result = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector({makeFlatVector<double>({9.223372036854776E18})}));
+  EXPECT_EQ(result.value(), std::numeric_limits<int64_t>::max());
+
+  // DOUBLE -> BIGINT: Long.MinValue - 0.9D saturates to Long.MinValue
+  result = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector({makeFlatVector<double>({-9.223372036854776E18})}));
+  EXPECT_EQ(result.value(), std::numeric_limits<int64_t>::min());
+
+  // DOUBLE -> INTEGER: 3.0e10 exceeds int32 range -> null
+  auto resultInt = evaluateOnce<int32_t>(
+      "try_cast(c0 as int)", makeRowVector({makeFlatVector<double>({3.0e10})}));
+  EXPECT_FALSE(resultInt.has_value());
+
+  // FLOAT -> BIGINT: clearly out of range -> null
+  auto resultNull = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector({makeFlatVector<float>({1.0e20f})}));
+  EXPECT_FALSE(resultNull.has_value());
+
+  // FLOAT -> TINYINT: out of byte range -> null
+  auto resultByte = evaluateOnce<int8_t>(
+      "try_cast(c0 as tinyint)",
+      makeRowVector({makeFlatVector<float>({3.0e9f})}));
+  EXPECT_FALSE(resultByte.has_value());
+
+  // FLOAT -> SMALLINT: out of short range -> null
+  auto resultShort = evaluateOnce<int16_t>(
+      "try_cast(c0 as smallint)",
+      makeRowVector({makeFlatVector<float>({1.0e6f})}));
+  EXPECT_FALSE(resultShort.has_value());
+
+  // DOUBLE -> TINYINT: negative out of range -> null
+  resultByte = evaluateOnce<int8_t>(
+      "try_cast(c0 as tinyint)",
+      makeRowVector({makeFlatVector<double>({-200.0})}));
+  EXPECT_FALSE(resultByte.has_value());
+
+  // NaN should return null for try_cast
+  resultNull = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector(
+          {makeFlatVector<float>({std::numeric_limits<float>::quiet_NaN()})}));
+  EXPECT_FALSE(resultNull.has_value());
+
+  // In-range values should work normally
+  resultByte = evaluateOnce<int8_t>(
+      "try_cast(c0 as tinyint)",
+      makeRowVector({makeFlatVector<float>({100.5f})}));
+  EXPECT_EQ(resultByte.value(), 100);
+
+  auto resultBigint = evaluateOnce<int64_t>(
+      "try_cast(c0 as bigint)",
+      makeRowVector({makeFlatVector<double>({42.7})}));
+  EXPECT_EQ(resultBigint.value(), 42);
+
+  // DOUBLE -> INTEGER: Int.MaxValue + 0.9D truncates to Int.MaxValue
+  // (trunc(2147483647.9) = 2147483647 which fits in int)
+  resultInt = evaluateOnce<int32_t>(
+      "try_cast(c0 as int)",
+      makeRowVector({makeFlatVector<double>({2147483647.9})}));
+  EXPECT_EQ(resultInt.value(), std::numeric_limits<int32_t>::max());
+
+  // DOUBLE -> INTEGER: Int.MinValue - 0.9D truncates to Int.MinValue
+  resultInt = evaluateOnce<int32_t>(
+      "try_cast(c0 as int)",
+      makeRowVector({makeFlatVector<double>({-2147483648.9})}));
+  EXPECT_EQ(resultInt.value(), std::numeric_limits<int32_t>::min());
+}
+
+TEST_F(SparkCastExprTest, tryCastNotAffectedByAnsiMode) {
+  auto guard = folly::makeGuard([&] { setAnsiSupport(false); });
+  setAnsiSupport(true);
+
+  // TRY_CAST should return null on overflow even with ANSI on
+  auto result = evaluateOnce<int8_t>(
+      "try_cast(c0 as tinyint)",
+      makeRowVector({makeFlatVector<int32_t>({256})}));
+  EXPECT_FALSE(result.has_value());
+
+  // TRY_CAST float overflow -> null even with ANSI on
+  auto resultFloat = evaluateOnce<int32_t>(
+      "try_cast(c0 as int)", makeRowVector({makeFlatVector<float>({3.0e10f})}));
+  EXPECT_FALSE(resultFloat.has_value());
+}
+
 } // namespace
 } // namespace facebook::velox::test
