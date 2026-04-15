@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #pragma once
 
-#include <cstdint>
-#include <string>
+#include "velox/common/config/ConfigProvider.h"
 
-namespace facebook::velox::dwio::common {
+namespace facebook::velox::core {
 
-/// File format specific metadata returned when a writer is closed.
-/// Caller of Writer::close() can do further processing such as aggregate
-/// row group statistics to file level statistics based on the metadata.
-class FileMetadata {
+/// Exposes all QueryConfig properties as ConfigProperty entries.
+class QueryConfigProvider : public config::ConfigProvider {
  public:
-  virtual ~FileMetadata() = default;
+  std::vector<config::ConfigProperty> properties() const override;
+
+  std::string normalize(std::string_view name, std::string_view value)
+      const override;
 };
 
-} // namespace facebook::velox::dwio::common
+} // namespace facebook::velox::core
