@@ -111,6 +111,20 @@ String Functions
         SELECT conv("11abc", 10, 10); -- '11'
         SELECT conv('H016F', 16, 10); -- '0'
 
+.. spark:function:: elt(n, input1, input2, ...) -> varchar|varbinary (ANSI compliant)
+
+    Returns the ``n``-th input (1-based). The inputs must be all VARCHAR or all VARBINARY,
+    and the result has the same type. Spark's analyzer casts other input types to VARCHAR
+    before calling this function. Returns NULL if ``n`` is NULL or the selected input is NULL.
+    If ``n`` is out of range (zero, negative, or greater than the number of inputs),
+    returns NULL when Spark ANSI mode is disabled and throws an exception when Spark ANSI mode
+    is enabled. ::
+
+        SELECT elt(1, 'hello', 'world'); -- 'hello'
+        SELECT elt(2, 'hello', 'world'); -- 'world'
+        SELECT elt(3, 'hello', 'world'); -- NULL (with ANSI mode disabled)
+        SELECT elt(3, 'hello', 'world'); -- Error (with ANSI mode enabled)
+
 .. spark:function:: empty2null(input) -> varchar
 
     Returns NULL if ``input`` is empty. Otherwise, returns ``input``.
@@ -119,6 +133,27 @@ String Functions
 
         SELECT empty2null(''); -- NULL
         SELECT empty2null('abc'); -- 'abc'
+
+.. spark:function:: encode(string, charset) -> varbinary
+
+    Encodes the first argument into a binary using the provided ``charset``.
+    Returns NULL if either argument is NULL.
+    Supported charsets (case-insensitive) are ``US-ASCII``, ``ISO-8859-1``,
+    ``UTF-8``, ``UTF-16BE``, ``UTF-16LE``, ``UTF-16``, and ``UTF-32``. Throws
+    an exception when ``charset`` is not supported or a character cannot be
+    represented by the selected charset. When ``spark.legacy_java_charsets`` is
+    enabled, additional Java-compatible charsets and aliases such as
+    ``windows-1252``, ``Shift_JIS``, ``UTF8``, and ``LATIN1`` are also
+    accepted. When ``spark.legacy_coding_error_action`` is enabled, unmappable
+    characters use the selected charset's replacement bytes. ``UTF-16`` prepends
+    a big-endian byte-order mark; ``UTF-32`` emits big-endian data without a
+    byte-order mark. Malformed UTF-8 in ``string`` is normalized to the
+    replacement character ``U+FFFD`` before encoding. ::
+
+        SELECT encode('Spark SQL', 'UTF-8'); -- [53 70 61 72 6B 20 53 51 4C]
+        SELECT encode('A', 'UTF-16BE'); -- [00 41]
+        SELECT encode('A', 'UTF-16LE'); -- [41 00]
+        SELECT encode('A', 'UTF-32'); -- [00 00 00 41]
 
 .. spark:function:: endswith(left, right) -> boolean
 
