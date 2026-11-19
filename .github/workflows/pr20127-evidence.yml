@@ -1,0 +1,178 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: PR 20127 literal argument evidence
+
+on:
+  push:
+    branches:
+      - evidence/pr20127-literal-campaigns
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr20127-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_REVISION: 071fa55d6d52399b02c8dca08765e389ce90bcc5
+
+jobs:
+  campaigns:
+    if: github.repository == 'minni31/velox'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    container:
+      image: ghcr.io/facebookincubator/velox-dev@sha256:97cb1193cc31bcde01cd6215e7ffff5d206273ecfeb408ab2b890f3abaf32556
+    defaults:
+      run:
+        shell: bash
+    env:
+      BASH_ENV: /opt/rh/gcc-toolset-12/enable
+      NUM_THREADS: 1
+      MAX_HIGH_MEM_JOBS: 1
+      MAX_LINK_JOBS: 1
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
+
+    steps:
+      - name: Checkout evidence harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: harness
+          persist-credentials: false
+
+      - name: Validate evidence parser
+        working-directory: harness
+        run: python3 -m unittest scripts.tests.test_pr20127_evidence
+
+      - name: Checkout exact PR source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: facebookincubator/velox
+          ref: ${{ env.SOURCE_REVISION }}
+          path: velox
+          persist-credentials: false
+
+      - name: Record source and toolchain
+        working-directory: velox
+        run: |
+          mkdir -p ../evidence
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          test -z "$(git status --porcelain)"
+          {
+            git rev-parse HEAD
+            "$CXX" --version
+            cmake --version
+            nproc
+            cat /proc/meminfo
+            df -h .
+          } > ../evidence/build-environment.txt
+
+      - name: Build only the fuzzer and reference smoke test
+        id: build
+        working-directory: velox
+        timeout-minutes: 240
+        env:
+          EXTRA_CMAKE_FLAGS: >-
+            -DVELOX_ENABLE_SPARK_FUNCTIONS=ON
+            -DVELOX_ENABLE_PARQUET=ON
+            -DVELOX_MONO_LIBRARY=OFF
+            -DCMAKE_CXX_FLAGS_RELEASE='-O1 -DNDEBUG'
+            -DCMAKE_C_FLAGS_RELEASE='-O1 -DNDEBUG'
+        run: |
+          make release \
+            TARGETS="spark_aggregation_fuzzer_test velox_spark_query_runner_test" \
+            2>&1 | tee ../evidence/build.log
+
+      - name: Start Spark Connect and verify readiness
+        id: spark
+        timeout-minutes: 5
+        run: |
+          bash /opt/start-spark.sh 2>&1 | tee evidence/spark-startup.log
+          python3 - <<'PY'
+          import socket
+          import time
+
+          deadline = time.monotonic() + 240
+          while time.monotonic() < deadline:
+              try:
+                  with socket.create_connection(("localhost", 15002), timeout=2):
+                      break
+              except OSError:
+                  time.sleep(2)
+          else:
+              raise SystemExit("Spark Connect did not become ready")
+          PY
+
+      - name: Verify literal values against Spark
+        id: smoke
+        working-directory: velox
+        timeout-minutes: 5
+        run: |
+          _build/release/velox/functions/sparksql/fuzzer/tests/velox_spark_query_runner_test \
+            --gtest_also_run_disabled_tests \
+            --gtest_filter=SparkQueryRunnerTest.DISABLED_literalArguments \
+            --gtest_output=xml:../evidence/spark-literals.xml \
+            2>&1 | tee ../evidence/spark-literals.log
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("../evidence/spark-literals.xml").getroot()
+          assert int(root.attrib["tests"]) == 1, "Literal smoke test did not run"
+          assert int(root.attrib["failures"]) == 0, "Literal smoke test failed"
+          assert int(root.attrib["errors"]) == 0, "Literal smoke test errored"
+          PY
+
+      - name: Run 30-minute focused Bloom campaign
+        working-directory: velox
+        timeout-minutes: 40
+        run: |
+          python3 ../harness/scripts/ci/pr20127_evidence.py run \
+            --expected-revision "$SOURCE_REVISION" \
+            --binary _build/release/velox/functions/sparksql/fuzzer/spark_aggregation_fuzzer_test \
+            --output ../evidence/focused --campaign focused --seed 123
+
+      - name: Run 30-minute mixed campaign
+        if: >-
+          !cancelled() &&
+          steps.build.outcome == 'success' &&
+          steps.spark.outcome == 'success' &&
+          steps.smoke.outcome == 'success'
+        working-directory: velox
+        timeout-minutes: 40
+        run: |
+          python3 ../harness/scripts/ci/pr20127_evidence.py run \
+            --expected-revision "$SOURCE_REVISION" \
+            --binary _build/release/velox/functions/sparksql/fuzzer/spark_aggregation_fuzzer_test \
+            --output ../evidence/mixed --campaign mixed --seed 456
+
+      - name: Verify campaign duration and actual comparison coverage
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' }}
+        run: |
+          python3 harness/scripts/ci/pr20127_evidence.py summarize \
+            --expected-revision "$SOURCE_REVISION" --output evidence
+          cat evidence/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Archive evidence even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr20127-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            evidence/
+            velox/_build/release/CMakeCache.txt
+            /opt/spark-server/logs/
